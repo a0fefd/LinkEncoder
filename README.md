@@ -1,9 +1,9 @@
-# Link Encryptor
+# Link Encoder
 
-## Setup
 
-For setup instructions, please see the [Fabric Documentation page](https://docs.fabricmc.net/develop/getting-started/creating-a-project#setting-up) related to the IDE that you are using.
+## Functionality
 
-## License
+Adds a message intercept that takes sent links and encodes them with Base64, alongside taking recieved B64 encoded text, checking if they are encoded links and then decoding them before handing the plaintext back to the user.
+The links that are handed to the user are highlighted and underlined to identify them, as well as being clickable.
+Additionally, when a url belongs to an image, the user can hover their cursor over it to preview the linked image.
 
-This template is available under the CC0 license. Feel free to learn from it and incorporate it in your own projects.
