@@ -1,19 +1,36 @@
 package com.nb.client;
 
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.List;
+import net.minecraft.client.Minecraft;
+
+import java.net.HttpURLConnection;
+import java.net.URI;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Utils {
+
+
+    private static final String TAIL = "[-A-Za-z0-9+&@#/%?=~_|!:,.;]*[-A-Za-z0-9+&@#/%=~_|]";
+
+    public static final Pattern LINK = Pattern.compile(
+            "\\b(?:(?:https?|ftp)://|www\\.)" + TAIL
+                    + "|\\b[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)*\\.(?:com|net|org|io|dev|gg|edu|gov)\\b(?:/" + TAIL + ")?",
+            Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern BASE64_PATTERN = Pattern.compile(
+            "^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{4}|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)?$"
+    );
+
+
     public static List<String> extractLinks(String text) {
         List<String> links = new ArrayList<>();
         // Regex matches http, https, ftp, and www links
-        String urlRegex = "\\b(https?://|www\\.|ftp://)[-A-Za-z0-9+&@#/%?=~_|!:,.;]*[-A-Za-z0-9+&@#/%=~_|]";
+//        String urlRegex = "\\b(https?://|www\\.|ftp://)[-A-Za-z0-9+&@#/%?=~_|!:,.;]*[-A-Za-z0-9+&@#/%=~_|](\\.com|\\.net|\\.org)";
 
-        Pattern pattern = Pattern.compile(urlRegex, Pattern.CASE_INSENSITIVE);
-        Matcher matcher = pattern.matcher(text);
+        Matcher matcher = LINK.matcher(text);
 
         while (matcher.find()) {
             String link = matcher.group();
@@ -25,16 +42,6 @@ public class Utils {
         }
         return links;
     }
-
-    private static final Pattern LINK = Pattern.compile(
-            "\\b(https?://|www\\.|ftp://)[-A-Za-z0-9+&@#/%?=~_|!:,.;]*[-A-Za-z0-9+&@#/%=~_|]",
-            Pattern.CASE_INSENSITIVE
-    );
-
-    private static final Pattern BASE64_PATTERN = Pattern.compile(
-            "^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{4}|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)?$"
-    );
-
 
     //    public static boolean isBase64(String text) {
 //        if (text == null || text.isEmpty()) return false;
@@ -60,6 +67,59 @@ public class Utils {
         } catch (IllegalArgumentException e) {
             return false;
         }
+    }
+
+    private static final Pattern IMAGE_EXT = Pattern.compile(
+            "\\.(png|jpe?g|gif|bmp|tga)$", Pattern.CASE_INSENSITIVE);
+
+    public static boolean looksLikeImage(String url) {
+        try {
+            URI uri = URI.create(url.contains("://") ? url : "https://" + url);
+            String path = uri.getPath();
+            return path != null && IMAGE_EXT.matcher(path).find();
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    private static final Map<String, Boolean> IMAGE_CACHE = new ConcurrentHashMap<>();
+
+    public static void isImage(String url, Consumer<Boolean> callback) {
+        Boolean cached = IMAGE_CACHE.get(url);
+        if (cached != null) {
+            callback.accept(cached);
+            return;
+        }
+
+        Thread thread = new Thread(() -> {
+            boolean result = false;
+
+            try {
+                HttpURLConnection connection = (HttpURLConnection) URI.create(url).toURL().openConnection();
+                connection.setRequestMethod("HEAD");
+                connection.setInstanceFollowRedirects(true);
+                connection.setConnectTimeout(5_000);
+                connection.setReadTimeout(5_000);
+                connection.setRequestProperty("User-Agent", "link-encoder");
+
+                String type = connection.getContentType();
+                result = type != null && type.toLowerCase(Locale.ROOT).startsWith("image/");
+                connection.disconnect();
+            } catch (Exception e) {
+                LinkEncoderClient.LOGGER.debug("HEAD failed: {}", url, e);
+            }
+
+            IMAGE_CACHE.put(url, result);
+            boolean finalResult = result;
+            Minecraft.getInstance().execute(() -> callback.accept(finalResult));
+        }, "image-check");
+
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    public static String normalize(String url) {
+        return url.contains("://") ? url : "https://" + url;
     }
 
 }

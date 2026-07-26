@@ -9,16 +9,15 @@ import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.HoverEvent;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.chat.Style;
+import net.minecraft.network.chat.*;
 import net.minecraft.network.chat.contents.PlainTextContents;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.resources.Identifier;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -33,8 +32,8 @@ public class LinkEncoderClient implements ClientModInitializer {
 	private static final Set<String> MESSAGE_COMMANDS =
 			Set.of("msg", "tell", "w", "whisper", "r", "reply", "say", "me", "ch", "pc", "gc", "cc");
 
-	private static final Pattern LINK = Pattern.compile(
-			"https?://\\S+", Pattern.CASE_INSENSITIVE);
+//	private static final Pattern LINK = Pattern.compile(
+//			"https?://\\S+", Pattern.CASE_INSENSITIVE);
 
 	private static String dump(Component c, int depth) {
 		StringBuilder sb = new StringBuilder();
@@ -71,20 +70,55 @@ public class LinkEncoderClient implements ClientModInitializer {
 		ClientReceiveMessageEvents.MODIFY_GAME.register((message, overlay) -> {
 			if (overlay) return message;
 			Component out = transform(message);
-			LOGGER.info("BEFORE\n{}AFTER\n{}", dump(message, 0), dump(out, 0));
+//			LOGGER.info("BEFORE\n{}AFTER\n{}", dump(message, 0), dump(out, 0));
 			return out;
 		});
 
+		ImagePreview.register();
+
 		ClientCommandRegistrationCallback.EVENT.register(((dispatcher, buildContext) -> {
 			dispatcher.register(ClientCommands.literal("encode")
-					.then(ClientCommands.argument("plaintext", StringArgumentType.string())
+					.then(ClientCommands.argument("plaintext", StringArgumentType.greedyString())
 							.executes(com.nb.client.Commands::encode))
 			);
 			dispatcher.register(ClientCommands.literal("decode")
-					.then(ClientCommands.argument("encoded", StringArgumentType.string())
+					.then(ClientCommands.argument("encoded", StringArgumentType.greedyString())
 							.executes(com.nb.client.Commands::decode))
 			);
+//			dispatcher.register(ClientCommands.literal("view")
+//					.then(ClientCommands.argument("url", StringArgumentType.greedyString())
+//							.executes(ctx -> {
+//								ImageScreen.open(StringArgumentType.getString(ctx, "url"));
+//								return 1;
+//							})));
+
+
+			dispatcher.register(ClientCommands.literal("view")
+					.executes(ctx -> { ImagePreview.clear(); return 1; })
+					.then(ClientCommands.argument("url", StringArgumentType.greedyString())
+							.executes(ctx -> {
+								ImagePreview.show(Utils.normalize(StringArgumentType.getString(ctx, "url")));
+								return 1;
+							})));
 		}));
+	}
+
+	private static Style linkStyle(String url) {
+		Style style = Style.EMPTY
+				.withColor(0x4f89d9)
+				.withUnderlined(true)
+				.withHoverEvent(new HoverEvent.ShowText(Component.literal(url)))
+				.withInsertion(url);
+
+		if (Utils.looksLikeImage(url)) {
+			return style.withClickEvent(new ClickEvent.RunCommand("/view " + Utils.normalize(url)));
+		}
+
+		try {
+			return style.withClickEvent(new ClickEvent.OpenUrl(URI.create(Utils.normalize(url))));
+		} catch (IllegalArgumentException e) {
+			return style;
+		}
 	}
 
 	private static boolean checkMessage(Component message) {
@@ -103,7 +137,7 @@ public class LinkEncoderClient implements ClientModInitializer {
 
 
 	private static String encodeLinks(String text) {
-		if (!text.contains("http") && !text.contains("www.")) return text;
+//		if (!text.contains("http") && !text.contains("www.") && !text.contains(".com") && !text.contains(".org") && !text.contains(".net")) return text;
 
 		String encoded = text;
 		for (String link : Utils.extractLinks(text)) {
@@ -133,9 +167,26 @@ public class LinkEncoderClient implements ClientModInitializer {
 	 * click event. Only the text of plain-text nodes is rewritten.
 	 */
 	private static Component transform(Component source) {
-		MutableComponent result = source.getContents() instanceof PlainTextContents plain
-				? rewrite(plain.text(), source.getStyle())
-				: source.plainCopy().setStyle(source.getStyle());
+		MutableComponent result;
+
+		if (source.getContents() instanceof PlainTextContents plain) {
+			result = rewrite(plain.text(), source.getStyle());
+		} else if (source.getContents() instanceof TranslatableContents translatable) {
+			Object[] args = translatable.getArgs();
+			Object[] rewritten = new Object[args.length];
+
+			for (int i = 0; i < args.length; i++) {
+				if (args[i] instanceof Component c) rewritten[i] = transform(c);
+				else if (args[i] instanceof String s) rewritten[i] = decode(s);
+				else rewritten[i] = args[i];
+			}
+
+			result = Component.translatableWithFallback(
+							translatable.getKey(), translatable.getFallback(), rewritten)
+					.setStyle(source.getStyle());
+		} else {
+			result = source.plainCopy().setStyle(source.getStyle());
+		}
 
 		for (Component sibling : source.getSiblings()) {
 			result.append(transform(sibling));
@@ -147,7 +198,7 @@ public class LinkEncoderClient implements ClientModInitializer {
 	/** Link runs override only colour and underline, so they still inherit the parent's click event. */
 	private static MutableComponent rewrite(String text, Style style) {
 		String decoded = decode(text);
-		Matcher matcher = LINK.matcher(decoded);
+		Matcher matcher = Utils.LINK.matcher(decoded);
 
 		if (!matcher.find()) return Component.literal(decoded).setStyle(style);
 		matcher.reset();
@@ -160,10 +211,12 @@ public class LinkEncoderClient implements ClientModInitializer {
 				root.append(Component.literal(decoded.substring(cursor, matcher.start())));
 			}
 
-			root.append(Component.literal(matcher.group()).withStyle(s -> s
+//			root.append(Component.literal(matcher.group()).withStyle(s -> s
 //					.withColor(ChatFormatting.BLUE)
 //					.withUnderlined(true)
-			));
+//			));
+
+			root.append(Component.literal(matcher.group()).setStyle(linkStyle(matcher.group())));
 
 			cursor = matcher.end();
 		}
@@ -174,35 +227,6 @@ public class LinkEncoderClient implements ClientModInitializer {
 
 		return root;
 	}
-
-
-	private static Component highlight(String text) {
-		MutableComponent root = Component.empty();
-		Matcher matcher = LINK.matcher(text);
-		int cursor = 0;
-
-		while (matcher.find()) {
-			if (matcher.start() > cursor) {
-				root.append(Component.literal(text.substring(cursor, matcher.start())));
-			}
-
-			String url = matcher.group();
-			root.append(Component.literal(url).withStyle(style -> style
-//					.withColor(ChatFormatting.BLUE)
-//					.withUnderlined(true)
-					.withInsertion(url)
-					.withHoverEvent(new HoverEvent.ShowText(Component.literal(url)))));
-
-			cursor = matcher.end();
-		}
-
-		if (cursor < text.length()) {
-			root.append(Component.literal(text.substring(cursor)));
-		}
-
-		return root;
-	}
-
 
 	public static Identifier id(String path) {
 		return Identifier.fromNamespaceAndPath(MOD_ID, path);

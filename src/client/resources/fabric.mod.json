@@ -15,5 +15,9 @@
     "minecraft": "26.1.2"
   },
   "mixins": [
+    {
+      "config": "link-encoder.client.mixins.json",
+      "environment": "client"
+    }
   ]
 }
