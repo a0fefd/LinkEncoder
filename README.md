@@ -24,7 +24,19 @@ images quite humorous, and we always looked forward to seeing new images, althou
 learning of their removal. So I personally decided to seek a solution that helps people who are interested in 
 having it back.
 
-## Disclaimer / Warning! - Use at your own risk
+## How to Use?
+
+In it's most basic form, you just send a url and the mod will do everything for you! Any link the mod recognises as
+an image, you can hover your cursor over it to view the image in the selected location. \
+The mod is configured using commands:
+```
+/linkencoder toggle encode|decode|preview        # toggling of each feature, all enabled by default
+/linkencoder colour <rgb>                        # link colour, default is 4f89d9
+/linkencoder position [top|bottom]_[left|right]  # image preview position, default is bottom_right
+/linkencoder offset <x> <y>                      # offset from selected corner 
+```
+
+## Disclaimer / Warning! - Use on servers at your own risk
 
 I (developer) do not take any responsibility for and possible punishments relating to the use of this mod.
 
