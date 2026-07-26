@@ -94,6 +94,22 @@ public class LinkEncoderClient implements ClientModInitializer {
 				overlay || !Config.get().decode ? message : transform(message));
 
 		ClientCommandRegistrationCallback.EVENT.register(((dispatcher, buildContext) -> {
+			dispatcher.register(ClientCommands.literal("encode")
+					.then(ClientCommands.argument("plaintext", StringArgumentType.greedyString())
+							.executes(com.nb.client.Commands::encode))
+			);
+			dispatcher.register(ClientCommands.literal("decode")
+					.then(ClientCommands.argument("encoded", StringArgumentType.greedyString())
+							.executes(com.nb.client.Commands::decode))
+			);
+			dispatcher.register(ClientCommands.literal("view")
+					.executes(ctx -> { ImagePreview.clear(); return 1; })
+					.then(ClientCommands.argument("url", StringArgumentType.greedyString())
+							.executes(ctx -> {
+								ImagePreview.show(Utils.normalize(StringArgumentType.getString(ctx, "url")));
+								return 1;
+							})));
+
 			ConfigCommand.register(dispatcher);
 		}));
 	}
