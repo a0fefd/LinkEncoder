@@ -18,12 +18,8 @@ import java.net.URI;
 public final class ImagePreview {
 
     private static final int MAX_BYTES = 8 * 1024 * 1024;
-    private static final int MARGIN = 4;
-    private static final int MAX_HEIGHT = 200;
-    private static final int MAX_WIDTH = (int)((float)16/9 * (float)MAX_HEIGHT);
-
-    /** Raise this to lift the preview clear of the hotbar on narrow windows. */
-    private static final int BOTTOM_OFFSET = 0;
+    private static final int MAX_WIDTH = 200;
+    private static final int MAX_HEIGHT = 130;
 
     /** How long /view keeps the preview up. Hover ignores this entirely. */
     private static final long HIDE_AFTER_MS = 2_000;
@@ -52,12 +48,16 @@ public final class ImagePreview {
 
     /** Hover: visible only while the cursor stays on the link. Never pins. */
     public static void hover(String url) {
+        if (!Config.get().preview) return;
+
         hoveredThisFrame = true;
         load(url);
     }
 
     /** Command: visible for HIDE_AFTER_MS regardless of the cursor. */
     public static void show(String url) {
+        if (!Config.get().preview) return;
+
         pinnedUntil = System.currentTimeMillis() + HIDE_AFTER_MS;
         load(url);
     }
@@ -132,8 +132,19 @@ public final class ImagePreview {
 
         int w = Math.max(1, Math.round(imageWidth * scale));
         int h = Math.max(1, Math.round(imageHeight * scale));
-        int x = Minecraft.getInstance().getWindow().getGuiScaledWidth() - w - MARGIN;
-        int y = Minecraft.getInstance().getWindow().getGuiScaledHeight() - h - MARGIN - BOTTOM_OFFSET;
+        Config.Data cfg = Config.get();
+        int screenWidth = Minecraft.getInstance().getWindow().getGuiScaledWidth();
+        int screenHeight = Minecraft.getInstance().getWindow().getGuiScaledHeight();
+
+        int x = switch (cfg.corner) {
+            case TOP_LEFT, BOTTOM_LEFT -> cfg.offsetX;
+            case TOP_RIGHT, BOTTOM_RIGHT -> screenWidth - w - cfg.offsetX;
+        };
+
+        int y = switch (cfg.corner) {
+            case TOP_LEFT, TOP_RIGHT -> cfg.offsetY;
+            case BOTTOM_LEFT, BOTTOM_RIGHT -> screenHeight - h - cfg.offsetY;
+        };
 
         graphics.fill(x - 1, y - 1, x + w + 1, y + h + 1, 0xC0000000);
 

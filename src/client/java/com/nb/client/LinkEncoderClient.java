@@ -53,59 +53,54 @@ public class LinkEncoderClient implements ClientModInitializer {
 		// However, some things (like resources) may still be uninitialized.
 		// Proceed with mild caution.
 
-		LOGGER.info("Link Encoder Initialized");
+//		LOGGER.info("Link Encoder Initialized");
 
-		ClientSendMessageEvents.MODIFY_CHAT.register(LinkEncoderClient::encodeLinks);
+		Config.load();
+		ImagePreview.register();
+
+//		ClientSendMessageEvents.MODIFY_CHAT.register(LinkEncoderClient::encodeLinks);
+//
+//		ClientSendMessageEvents.MODIFY_COMMAND.register(command ->
+//				isMessageCommand(command) ? encodeLinks(command) : command);
+//
+//		ClientReceiveMessageEvents.ALLOW_CHAT.register((message, signedMessage, sender, params, timestamp) -> {
+//			if (!checkMessage(message)) return true;
+//			Minecraft.getInstance().gui.getChat()
+//					.addPlayerMessage(transform(message), null, null);
+//			return false;
+//		});
+//
+//		ClientReceiveMessageEvents.MODIFY_GAME.register((message, overlay) -> {
+//			if (overlay) return message;
+//			Component out = transform(message);
+////			LOGGER.info("BEFORE\n{}AFTER\n{}", dump(message, 0), dump(out, 0));
+//			return out;
+//		});
+
+		ClientSendMessageEvents.MODIFY_CHAT.register(text ->
+				Config.get().encode ? encodeLinks(text) : text);
 
 		ClientSendMessageEvents.MODIFY_COMMAND.register(command ->
-				isMessageCommand(command) ? encodeLinks(command) : command);
+				Config.get().encode && isMessageCommand(command) ? encodeLinks(command) : command);
 
 		ClientReceiveMessageEvents.ALLOW_CHAT.register((message, signedMessage, sender, params, timestamp) -> {
-			if (!checkMessage(message)) return true;
+			if (!Config.get().decode || !checkMessage(message)) return true;
 			Minecraft.getInstance().gui.getChat()
 					.addPlayerMessage(transform(message), null, null);
 			return false;
 		});
 
-		ClientReceiveMessageEvents.MODIFY_GAME.register((message, overlay) -> {
-			if (overlay) return message;
-			Component out = transform(message);
-//			LOGGER.info("BEFORE\n{}AFTER\n{}", dump(message, 0), dump(out, 0));
-			return out;
-		});
-
-		ImagePreview.register();
+		ClientReceiveMessageEvents.MODIFY_GAME.register((message, overlay) ->
+				overlay || !Config.get().decode ? message : transform(message));
 
 		ClientCommandRegistrationCallback.EVENT.register(((dispatcher, buildContext) -> {
-			dispatcher.register(ClientCommands.literal("encode")
-					.then(ClientCommands.argument("plaintext", StringArgumentType.greedyString())
-							.executes(com.nb.client.Commands::encode))
-			);
-			dispatcher.register(ClientCommands.literal("decode")
-					.then(ClientCommands.argument("encoded", StringArgumentType.greedyString())
-							.executes(com.nb.client.Commands::decode))
-			);
-//			dispatcher.register(ClientCommands.literal("view")
-//					.then(ClientCommands.argument("url", StringArgumentType.greedyString())
-//							.executes(ctx -> {
-//								ImageScreen.open(StringArgumentType.getString(ctx, "url"));
-//								return 1;
-//							})));
-
-
-			dispatcher.register(ClientCommands.literal("view")
-					.executes(ctx -> { ImagePreview.clear(); return 1; })
-					.then(ClientCommands.argument("url", StringArgumentType.greedyString())
-							.executes(ctx -> {
-								ImagePreview.show(Utils.normalize(StringArgumentType.getString(ctx, "url")));
-								return 1;
-							})));
+			ConfigCommand.register(dispatcher);
 		}));
 	}
 
 	private static Style linkStyle(String url) {
 		Style style = Style.EMPTY
-				.withColor(0x4f89d9)
+				.withColor(Config.get().linkColour)
 				.withUnderlined(true)
 				.withHoverEvent(new HoverEvent.ShowText(Component.literal(url)))
 				.withInsertion(url);
