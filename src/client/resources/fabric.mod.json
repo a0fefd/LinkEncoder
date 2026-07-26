@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "id": "link-encryptor",
+  "id": "link-encoder",
   "version": "${version}",
-  "name": "Link Encryptor",
+  "name": "Link Encoder",
   "environment": "client",
   "entrypoints": {
     "client": [
-      "com.nb.client.LinkEncryptorClient"
+      "com.nb.client.LinkEncoderClient"
     ]
   },
   "depends": {
@@ -15,6 +15,5 @@
     "minecraft": "26.1.2"
   },
   "mixins": [
-    "link-encryptor.client.mixins.json"
   ]
 }
