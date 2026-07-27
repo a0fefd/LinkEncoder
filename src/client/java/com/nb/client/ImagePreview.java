@@ -18,8 +18,6 @@ import java.net.URI;
 public final class ImagePreview {
 
     private static final int MAX_BYTES = 8 * 1024 * 1024;
-    private static final int MAX_WIDTH = 200;
-    private static final int MAX_HEIGHT = 130;
 
     /** How long /view keeps the preview up. Hover ignores this entirely. */
     private static final long HIDE_AFTER_MS = 2_000;
@@ -126,13 +124,14 @@ public final class ImagePreview {
 
         if (!visible || texture == null) return;
 
+        Config.Data cfg = Config.get();
+
         float scale = Math.min(1.0f, Math.min(
-                (float) MAX_WIDTH / imageWidth,
-                (float) MAX_HEIGHT / imageHeight));
+                (float) cfg.sizeHorizontal / imageWidth,
+                (float) cfg.sizeVertical / imageHeight));
 
         int w = Math.max(1, Math.round(imageWidth * scale));
         int h = Math.max(1, Math.round(imageHeight * scale));
-        Config.Data cfg = Config.get();
         int screenWidth = Minecraft.getInstance().getWindow().getGuiScaledWidth();
         int screenHeight = Minecraft.getInstance().getWindow().getGuiScaledHeight();
 

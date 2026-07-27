@@ -71,6 +71,18 @@ public final class ConfigCommand {
                                     return 1;
                                 }))));
 
+        root.then(ClientCommands.literal("size")
+                .then(ClientCommands.argument("horizontal", IntegerArgumentType.integer(0, 1000))
+                        .then(ClientCommands.argument("vertical", IntegerArgumentType.integer(0, 1000))
+                                .executes(ctx -> {
+                                    Config.get().sizeHorizontal = IntegerArgumentType.getInteger(ctx, "horizontal");
+                                    Config.get().sizeVertical = IntegerArgumentType.getInteger(ctx, "vertical");
+                                    Config.save();
+                                    reply(ctx.getSource(), "size %d,%d"
+                                            .formatted(Config.get().sizeHorizontal, Config.get().sizeVertical));
+                                    return 1;
+                                }))));
+
         dispatcher.register(root);
     }
 

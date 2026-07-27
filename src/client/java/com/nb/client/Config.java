@@ -27,6 +27,9 @@ public final class Config {
         public Corner corner = Corner.BOTTOM_RIGHT;
         public int offsetX = 4;
         public int offsetY = 4;
+
+        public int sizeVertical = 300;
+        public int sizeHorizontal = 300;
     }
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
