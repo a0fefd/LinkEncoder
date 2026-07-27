@@ -23,6 +23,8 @@ public class Utils {
     private static final Pattern BASE64_PATTERN = Pattern.compile(
             "^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{4}|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)?$"
     );
+    private static final Set<String> MESSAGE_COMMANDS =
+            Set.of("msg", "tell", "w", "whisper", "r", "reply", "say", "me", "ch", "pc", "gc", "cc");
 
 
     public static List<String> extractLinks(String text) {
@@ -122,4 +124,9 @@ public class Utils {
         return url.contains("://") ? url : "https://" + url;
     }
 
+    static boolean isMessageCommand(String command) {
+        int space = command.indexOf(' ');
+        if (space < 0) return false;
+        return MESSAGE_COMMANDS.contains(command.substring(0, space).toLowerCase(Locale.ROOT));
+    }
 }

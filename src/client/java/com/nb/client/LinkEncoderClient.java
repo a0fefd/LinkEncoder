@@ -7,8 +7,8 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallba
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.network.chat.*;
 import net.minecraft.network.chat.contents.PlainTextContents;
 import net.minecraft.network.chat.contents.TranslatableContents;
@@ -18,9 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
-import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -29,13 +27,7 @@ public class LinkEncoderClient implements ClientModInitializer {
 	public static final String MOD_ID = "link-encoder";
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
-	private static final Set<String> MESSAGE_COMMANDS =
-			Set.of("msg", "tell", "w", "whisper", "r", "reply", "say", "me", "ch", "pc", "gc", "cc");
-
-//	private static final Pattern LINK = Pattern.compile(
-//			"https?://\\S+", Pattern.CASE_INSENSITIVE);
-
-	private static String dump(Component c, int depth) {
+    private static String dump(Component c, int depth) {
 		StringBuilder sb = new StringBuilder();
 		sb.append("  ".repeat(depth))
 				.append(c.getContents().getClass().getSimpleName())
@@ -49,39 +41,8 @@ public class LinkEncoderClient implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		// This code runs as soon as Minecraft is in a mod-load-ready state.
-		// However, some things (like resources) may still be uninitialized.
-		// Proceed with mild caution.
-
-//		LOGGER.info("Link Encoder Initialized");
-
 		Config.load();
 		ImagePreview.register();
-
-//		ClientSendMessageEvents.MODIFY_CHAT.register(LinkEncoderClient::encodeLinks);
-//
-//		ClientSendMessageEvents.MODIFY_COMMAND.register(command ->
-//				isMessageCommand(command) ? encodeLinks(command) : command);
-//
-//		ClientReceiveMessageEvents.ALLOW_CHAT.register((message, signedMessage, sender, params, timestamp) -> {
-//			if (!checkMessage(message)) return true;
-//			Minecraft.getInstance().gui.getChat()
-//					.addPlayerMessage(transform(message), null, null);
-//			return false;
-//		});
-//
-//		ClientReceiveMessageEvents.MODIFY_GAME.register((message, overlay) -> {
-//			if (overlay) return message;
-//			Component out = transform(message);
-////			LOGGER.info("BEFORE\n{}AFTER\n{}", dump(message, 0), dump(out, 0));
-//			return out;
-//		});
-
-		ClientSendMessageEvents.MODIFY_CHAT.register(text ->
-				Config.get().encode ? encodeLinks(text) : text);
-
-		ClientSendMessageEvents.MODIFY_COMMAND.register(command ->
-				Config.get().encode && isMessageCommand(command) ? encodeLinks(command) : command);
 
 		ClientReceiveMessageEvents.ALLOW_CHAT.register((message, signedMessage, sender, params, timestamp) -> {
 			if (!Config.get().decode || !checkMessage(message)) return true;
@@ -92,6 +53,19 @@ public class LinkEncoderClient implements ClientModInitializer {
 
 		ClientReceiveMessageEvents.MODIFY_GAME.register((message, overlay) ->
 				overlay || !Config.get().decode ? message : transform(message));
+
+		ClientSendMessageEvents.ALLOW_CHAT.register(message ->
+				!Config.get().encode || withinLimit(encodeLinks(message)));
+
+		ClientSendMessageEvents.MODIFY_CHAT.register(message ->
+				Config.get().encode ? encodeLinks(message) : message);
+
+		ClientSendMessageEvents.ALLOW_COMMAND.register(command ->
+				!Config.get().encode || !Utils.isMessageCommand(command)
+						|| withinLimit(encodeLinks(command)));
+
+		ClientSendMessageEvents.MODIFY_COMMAND.register(command ->
+				Config.get().encode && Utils.isMessageCommand(command) ? encodeLinks(command) : command);
 
 		ClientCommandRegistrationCallback.EVENT.register(((dispatcher, buildContext) -> {
 			dispatcher.register(ClientCommands.literal("encode")
@@ -113,6 +87,23 @@ public class LinkEncoderClient implements ClientModInitializer {
 			ConfigCommand.register(dispatcher);
 		}));
 	}
+
+	private static final int MAX_LENGTH = 256;
+
+	private static boolean withinLimit(String encoded) {
+		if (encoded.length() <= MAX_LENGTH) return true;
+
+		Minecraft.getInstance().gui.getChat().addClientSystemMessage(
+				Component.literal("[link-encoder] encoded to %d characters, %d over the %d limit, please reduce length!"
+								.formatted(encoded.length(), encoded.length() - MAX_LENGTH, MAX_LENGTH))
+						.withStyle(errorStyle));
+		return false;
+	}
+
+	private static final Style errorStyle = Style.EMPTY
+				.withColor(0xff4040)
+				.withUnderlined(true)
+				.withBold(true);
 
 	private static Style linkStyle(String url) {
 		Style style = Style.EMPTY
@@ -140,16 +131,7 @@ public class LinkEncoderClient implements ClientModInitializer {
 		return false;
 	}
 
-	private static boolean isMessageCommand(String command) {
-		int space = command.indexOf(' ');
-		if (space < 0) return false;
-		return MESSAGE_COMMANDS.contains(command.substring(0, space).toLowerCase(Locale.ROOT));
-	}
-
-
-	private static String encodeLinks(String text) {
-//		if (!text.contains("http") && !text.contains("www.") && !text.contains(".com") && !text.contains(".org") && !text.contains(".net")) return text;
-
+    private static String encodeLinks(String text) {
 		String encoded = text;
 		for (String link : Utils.extractLinks(text)) {
 			encoded = encoded.replace(link, Utils.B64Encode(link));
@@ -173,10 +155,6 @@ public class LinkEncoderClient implements ClientModInitializer {
 		return out.toString();
 	}
 
-	/**
-	 * Walks the tree instead of flattening it, so each node keeps its own style and
-	 * click event. Only the text of plain-text nodes is rewritten.
-	 */
 	private static Component transform(Component source) {
 		MutableComponent result;
 
@@ -206,7 +184,6 @@ public class LinkEncoderClient implements ClientModInitializer {
 		return result;
 	}
 
-	/** Link runs override only colour and underline, so they still inherit the parent's click event. */
 	private static MutableComponent rewrite(String text, Style style) {
 		String decoded = decode(text);
 		Matcher matcher = Utils.LINK.matcher(decoded);
