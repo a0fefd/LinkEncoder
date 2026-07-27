@@ -33,7 +33,8 @@ The mod is configured using commands:
 /linkencoder toggle encode|decode|preview        # toggling of each feature, all enabled by default
 /linkencoder colour <rgb>                        # link colour, default is 4f89d9
 /linkencoder position [top|bottom]_[left|right]  # image preview position, default is bottom_right
-/linkencoder offset <x> <y>                      # offset from selected corner 
+/linkencoder offset <x> <y>                      # offset from selected corner
+/linkencoder size <horizontal> <vertical>        # image preview size, expands away from and shrinks into corner
 ```
 
 ## Disclaimer / Warning! - Use on servers at your own risk
