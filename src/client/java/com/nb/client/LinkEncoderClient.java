@@ -14,6 +14,8 @@ import net.minecraft.network.chat.contents.PlainTextContents;
 import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.resources.Identifier;
 
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,7 +24,13 @@ import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.a0fefd.ConfigLib.Config;
+import com.a0fefd.ConfigLib.ConfigOption;
+import com.a0fefd.ConfigLib.ConfigOptionType;
+
 public class LinkEncoderClient implements ClientModInitializer {
+
+
 
 	public static final String MOD_ID = "link-encoder";
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
